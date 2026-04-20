@@ -5,4 +5,4 @@ set LIBCLANG_PATH=C:\Program Files\LLVM\bin
 set CMAKE_GENERATOR=Ninja
 set CARGO_TARGET_DIR=C:\sdt
 cd /d "%~dp0"
-C:\Users\shane\.cargo\bin\cargo build
+C:\Users\shane\.cargo\bin\cargo build %*
