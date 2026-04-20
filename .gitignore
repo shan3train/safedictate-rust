@@ -1,0 +1,14 @@
+# Build output
+/target/
+
+# Whisper models (large binary files)
+*.bin
+*.gguf
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store

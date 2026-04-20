@@ -1,0 +1,65 @@
+[package]
+name = "safedictate"
+version = "2.0.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Local voice-to-text dictation for Windows (WASAPI, Vulkan/CUDA)"
+license = "MIT"
+
+[[bin]]
+name = "safedictate"
+path = "src/main.rs"
+
+[dependencies]
+# --- UI -------------------------------------------------------------------
+eframe = { version = "0.30", default-features = false, features = [
+    "default_fonts",
+    "glow",
+] }
+egui = "0.30"
+catppuccin-egui = { version = "5.7", default-features = false, features = ["egui30"] }
+egui-phosphor = "0.8"
+
+# --- Audio (WASAPI via cpal) -----------------------------------------------
+cpal = { version = "0.15", features = ["wasm-bindgen"] }
+hound = "3"
+rubato = "0.16"
+
+# --- Transcription --------------------------------------------------------
+whisper-rs = { version = "0.16", features = ["tracing_backend"] }
+ureq = "2"
+
+# --- Input ----------------------------------------------------------------
+global-hotkey = "0.7"
+enigo = "0.6"
+
+# --- System tray ----------------------------------------------------------
+tray-icon = "0.19"
+
+# --- Config / serialization ----------------------------------------------
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+directories = "6"
+
+# --- Errors / logging ----------------------------------------------------
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = ["vulkan"]
+# Vulkan — AMD/NVIDIA/Intel. Needs Vulkan SDK at build time; vulkan-1.dll ships with GPU drivers.
+vulkan = ["whisper-rs/vulkan"]
+# CUDA — NVIDIA only, faster than Vulkan. Needs CUDA toolkit at build time.
+cuda = ["whisper-rs/cuda"]
+# CPU-only build: cargo build --no-default-features
+cpu-only = []
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
