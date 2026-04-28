@@ -1,67 +1,81 @@
-//! Generates the SafeDictate feather icon as raw RGBA bytes for the system tray.
-
 /// Render a 32×32 RGBA feather icon. Returns (rgba_bytes, width, height).
+///
+/// Designed to stay legible at 16×16 (system tray). Uses a filled
+/// rotated-ellipse vane + bright spine + quill tail, all on a dark circle.
 pub fn feather_rgba() -> (Vec<u8>, u32, u32) {
     const SIZE: u32 = 32;
     let mut px = vec![0u8; (SIZE * SIZE * 4) as usize];
 
-    let set = |px: &mut Vec<u8>, x: i32, y: i32, r: u8, g: u8, b: u8, a: u8| {
+    let plot = |px: &mut Vec<u8>, x: i32, y: i32, r: u8, g: u8, b: u8, a: u8| {
         if x < 0 || y < 0 || x >= SIZE as i32 || y >= SIZE as i32 { return; }
         let i = ((y as u32 * SIZE + x as u32) * 4) as usize;
-        px[i]     = r;
-        px[i + 1] = g;
-        px[i + 2] = b;
-        px[i + 3] = a;
+        px[i] = r; px[i+1] = g; px[i+2] = b; px[i+3] = a;
     };
 
-    // Background circle (dark)
-    let cx = SIZE as f32 / 2.0;
-    let cy = SIZE as f32 / 2.0;
-    let r_outer = 15.0f32;
+    // --- Background: dark Catppuccin Mocha circle ---
+    let bg_cx = SIZE as f32 / 2.0;
+    let bg_cy = SIZE as f32 / 2.0;
     for y in 0..SIZE as i32 {
         for x in 0..SIZE as i32 {
-            let dx = x as f32 + 0.5 - cx;
-            let dy = y as f32 + 0.5 - cy;
-            let dist = (dx * dx + dy * dy).sqrt();
-            if dist <= r_outer {
-                let aa = ((r_outer - dist) * 3.0).clamp(0.0, 1.0);
-                set(&mut px, x, y, 30, 30, 46, (aa * 220.0) as u8);
+            let dx = x as f32 + 0.5 - bg_cx;
+            let dy = y as f32 + 0.5 - bg_cy;
+            let dist = (dx*dx + dy*dy).sqrt();
+            if dist <= 15.5 {
+                let aa = ((15.5 - dist) * 4.0).clamp(0.0, 1.0);
+                plot(&mut px, x, y, 30, 30, 46, (aa * 255.0) as u8);
             }
         }
     }
 
-    // Feather quill — diagonal spine from bottom-left to top-right
-    let spine: &[(i32, i32)] = &[
-        (8,24),(9,23),(10,22),(11,21),(12,20),(13,19),(14,18),
-        (15,17),(16,16),(17,15),(18,14),(19,13),(20,12),(21,11),(22,10),
-    ];
-    for &(x, y) in spine {
-        for dx in -1..=1i32 {
-            set(&mut px, x + dx, y, 205, 214, 244, 255);
+    // --- Feather vane: filled rotated ellipse ---
+    // Center slightly upper-right, angled 45° (feather tip at NE, quill at SW)
+    let cx = 16.5f32;
+    let cy = 15.5f32;
+    let angle = std::f32::consts::PI * 0.25;
+    let (cos_a, sin_a) = (angle.cos(), angle.sin());
+    let major = 9.0f32;  // half-length along spine
+    let minor = 4.5f32;  // half-width
+
+    for y in 0..SIZE as i32 {
+        for x in 0..SIZE as i32 {
+            let dx = x as f32 + 0.5 - cx;
+            let dy = y as f32 + 0.5 - cy;
+            let u =  dx * cos_a + dy * sin_a; // along spine
+            let v = -dx * sin_a + dy * cos_a; // perpendicular
+            let e = (u/major)*(u/major) + (v/minor)*(v/minor);
+            if e < 1.0 {
+                // Soft edge AA + feather texture (faint barb pattern)
+                let edge_aa = ((1.0 - e) * 5.0).clamp(0.0, 1.0);
+                // Subtle barb shading: bands perpendicular to spine
+                let barb = (u * 2.5).sin() * 0.08 + 1.0;
+                let lum = (barb * edge_aa).clamp(0.0, 1.0);
+                let r = (205.0 * lum) as u8;
+                let g = (214.0 * lum) as u8;
+                let b = (244.0 * lum) as u8;
+                let a = (255.0 * edge_aa) as u8;
+                plot(&mut px, x, y, r, g, b, a);
+            }
         }
     }
 
-    // Barbs — short strokes fanning left and right of the spine
-    let barbs: &[(i32, i32, i32, i32)] = &[
-        // (spine_x, spine_y, barb_dx, barb_dy)
-        (10,22, -2,1),  (10,22, 1,-2),
-        (12,20, -2,1),  (12,20, 1,-2),
-        (14,18, -2,1),  (14,18, 1,-2),
-        (16,16, -2,1),  (16,16, 1,-2),
-        (18,14, -2,1),  (18,14, 1,-2),
-        (20,12, -2,1),  (20,12, 1,-2),
-        (22,10, -2,1),  (22,10, 1,-2),
-    ];
-    for &(sx, sy, bdx, bdy) in barbs {
-        for step in 1..=4i32 {
-            let alpha = (255.0 * (1.0 - step as f32 / 5.0)) as u8;
-            set(&mut px, sx + bdx * step, sy + bdy * step, 180, 190, 254, alpha);
-        }
+    // --- Spine: bright white line through feather center ---
+    let steps = 20;
+    for i in 0..=steps {
+        let t = (i as f32 / steps as f32) * 2.0 - 1.0; // -1..1
+        let u = t * major;
+        let sx = (cx + u * cos_a) as i32;
+        let sy = (cy + u * sin_a) as i32;
+        plot(&mut px, sx, sy, 255, 255, 255, 230);
     }
 
-    // Quill tip — small dot at top-right
-    set(&mut px, 23, 9, 205, 214, 244, 255);
-    set(&mut px, 24, 8, 205, 214, 244, 200);
+    // --- Quill tail: fading line below the vane ---
+    for i in 1..=6i32 {
+        let u = major + i as f32 * 1.4;
+        let sx = (cx + u * cos_a) as i32;
+        let sy = (cy + u * sin_a) as i32;
+        let a = (200 - i * 28).max(0) as u8;
+        plot(&mut px, sx, sy, 205, 214, 244, a);
+    }
 
     (px, SIZE, SIZE)
 }

@@ -60,12 +60,16 @@ impl RunStats {
 }
 
 pub fn run() -> Result<()> {
+    let (rgba, w, h) = crate::icon::feather_rgba();
+    let icon = std::sync::Arc::new(egui::viewport::IconData { rgba, width: w, height: h });
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size(MINI_SIZE)
             .with_title("SafeDictate")
             .with_decorations(false)
-            .with_always_on_top(),
+            .with_always_on_top()
+            .with_transparent(true)
+            .with_icon(icon),
         ..Default::default()
     };
 
@@ -338,6 +342,10 @@ fn transcription_pipeline(
 }
 
 impl eframe::App for DictateApp {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        [0.0, 0.0, 0.0, 0.0]
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.pump_hotkey_events();
         self.check_settings_changed();
@@ -367,8 +375,14 @@ impl DictateApp {
         let transcribing = self.transcribing.load(Ordering::SeqCst);
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::none().fill(ctx.style().visuals.window_fill()))
+            .frame(egui::Frame::none())
             .show(ctx, |ui| {
+                let rect = ui.max_rect();
+                ui.painter().rect_filled(
+                    rect,
+                    egui::Rounding::same(16.0),
+                    ctx.style().visuals.window_fill(),
+                );
                 ui.centered_and_justified(|ui| {
                     let icon = if recording {
                         egui::RichText::new(icons::RECORD.to_string())
